@@ -79,7 +79,7 @@ def status():
     c.close()
     d = json.load(open(SAVE_FILE)) if os.path.exists(SAVE_FILE) else {}
     return {"saved": True, "file": SAVE_FILE, "db": DB_FILE, "keys": list(d.keys()), "counts": {k: len(v) if hasattr(v,'__len__') else v for k,v in d.items()}, "backups": len(os.listdir("backups"))}
-
+db().close()
 if __name__ == "__main__":
     print("PERSISTENT MODE: All data saves on every click | 0.0.0.0:5000")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), debug=True, threaded=True)
