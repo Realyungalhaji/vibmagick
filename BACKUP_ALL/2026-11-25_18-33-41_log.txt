@@ -1,0 +1,59 @@
+nohup: ignoring input
+ * Serving Flask app 'app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.222.241.93:5000
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [25/Nov/2026 13:39:33] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:34] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:36] "GET /friends HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:36] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:37] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:39:37] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:41] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:41] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:39:41] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:46] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:47] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:48] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:50] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:51] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:39:51] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:54] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:56] "GET /friends HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:39:58] "GET /upload HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:01] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:03] "GET /upload HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:12] "[32mPOST /upload HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:40:13] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:14] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:16] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:19] "GET /friends HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:20] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:33] "[33mGET /chat/ HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:40:36] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:38] "GET /friends HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:39] "GET /upload HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:40] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:41] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:40:42] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:44] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:40:44] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:45] "GET /inbox HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:40:46] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:40:46] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:41:00] "[32mGET /profile HTTP/1.1[0m" 302 -
+127.0.0.1 - - [25/Nov/2026 13:41:00] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:48:58] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:48:59] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:49:38] "[33mGET /login HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:49:40] "[33mGET /login HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:49:50] "[33mGET /register HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:49:51] "[33mGET /register HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:49:53] "[33mGET /login HTTP/1.1[0m" 404 -
+127.0.0.1 - - [25/Nov/2026 13:49:57] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:49:59] "GET /feed HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:50:00] "GET /friends HTTP/1.1" 200 -
+127.0.0.1 - - [25/Nov/2026 13:50:01] "GET /upload HTTP/1.1" 200 -

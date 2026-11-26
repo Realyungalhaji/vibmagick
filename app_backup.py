@@ -1,0 +1,614 @@
+try:
+ import saver
+except: saver = None
+def BASE(title, body, show_nav=True):
+    nav = """<div style='background:#075E54;padding:0;display:flex;position:sticky;top:0;z-index:10'>
+    <a href='/chats_list' style='flex:1;text-align:center;color:white;text-decoration:none;padding:14px 0;font-weight:bold;border-bottom:3px solid white;'>CHATS</a>
+    <a href='/status' style='flex:1;text-align:center;color:#D0E8E2;text-decoration:none;padding:14px 0;font-weight:bold;'>STATUS</a>
+    <a href='/calls' style='flex:1;text-align:center;color:#D0E8E2;text-decoration:none;padding:14px 0;font-weight:bold;'>CALLS</a>
+    <a href='/profile' style='flex:1;text-align:center;color:#D0E8E2;text-decoration:none;padding:14px 0;font-weight:bold;'>PROFILE</a>
+    </div>""" if show_nav else ""
+    return f"""<html><head><meta name='viewport' content='width=device-width,initial-scale=1'>
+    <link rel='preconnect' href='https://fonts.googleapis.com'><link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'><meta name='theme-color' content='#075E54'>
+    <title>{title} - VibMagick</title>
+    <style>
+    *{{box-sizing:border-box}} body{{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial;background:#ECE5DD;color:#111}}
+    header{{background:#075E54;color:white;padding:14px 16px;font-size:20px;font-weight:800;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:11}}
+    header a{{color:white;text-decoration:none;font-size:18px}}
+    .wrap{{max-width:600px;margin:0 auto;padding:12px}}
+    .card{{background:white;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}}
+    button{{background:#25D366;color:white;border:none;padding:12px 20px;border-radius:25px;font-size:16px;font-weight:700;width:100%;cursor:pointer}}
+    button.secondary{{background:#E8E8E8;color:#111}}
+    input,textarea,select{{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin:6px 0;font-size:16px;background:white}}
+    a{{color:#075E54;text-decoration:none}}
+    .avatar{{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#ddd}}
+    .badge{{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:#20D5EC;border-radius:50%;color:white;font-size:11px;vertical-align:middle;margin-left:4px}}
+    </style></head>
+    <body><header><span>💬 VibMagick</span><span><a href='/search'>🔍</a> &nbsp; <a href='/profile'>👤</a></span></header>{nav}
+    <div class='wrap'><h2 style='margin:8px 4px;color:#075E54'>{title}</h2>{body}</div>
+
+</body></html>"""
+
+from you_routes import register_you
+from flask import Flask, request, redirect, session, send_from_directory
+
+import json, os
+DATA_FILE="data.json"
+def save_data():
+    try:
+        data={}
+        for k in ["users","videos","posts","comments","likes","follows","messages","notifications"]:
+            if k in globals():
+                data[k]=globals()[k]
+        # also save session users dict if e dey
+        with open(DATA_FILE,"w") as f: json.dump(data,f,indent=2)
+    except Exception as e: print("save error",e)
+
+def load_data():
+    global users, videos
+    try:
+        if os.path.exists(DATA_FILE):
+            d=json.load(open(DATA_FILE))
+            for k,v in d.items():
+                globals()[k]=v
+            print(f"loaded data: {list(d.keys())}")
+    except Exception as e: print("load error",e)
+
+load_data()
+
+# --- CEO / ADMIN ---
+CEO_USERNAME = "@realyungalhaji"
+def make_ceo():
+    try:
+        global users
+        for u in users:
+            if isinstance(u, dict) and u.get("username")==CEO_USERNAME:
+                u["role"]="CEO"
+                u["is_admin"]=True
+                u["is_ceo"]=True
+                print("CEO set:", CEO_USERNAME)
+                return
+        # if user no dey, create am
+        if isinstance(users, list):
+            users.append({"username":CEO_USERNAME,"name":"YuNg Alhaji","role":"CEO","is_admin":True,"is_ceo":True,"username":"Trust The Creator","followers":0,"following":0})
+            print("CEO created")
+    except Exception as e: print("ceo error",e)
+
+make_ceo()
+
+load_data()
+
+import sqlite3, os
+import secrets
+app = Flask(__name__)
+
+# --- REAL MODE ---
+import os, sqlite3, json
+REAL_MODE = True
+app.secret_key = os.environ.get("SECRET_KEY", "vibmagick-real-key-123")
+os.makedirs("static/uploads", exist_ok=True)
+os.makedirs("instance", exist_ok=True)
+def real_db():
+    c = sqlite3.connect("data.db")
+    c.row_factory = sqlite3.Row
+    c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT, bio TEXT, pic TEXT, verified INTEGER DEFAULT 0, created TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, caption TEXT, file TEXT, time TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT, receiver TEXT, text TEXT, time TEXT, seen INTEGER DEFAULT 0)")
+    c.execute("CREATE TABLE IF NOT EXISTS saved_posts (username TEXT, post_id INTEGER, PRIMARY KEY(username, post_id))")
+    c.execute("CREATE TABLE IF NOT EXISTS blocks (blocker TEXT, blocked TEXT, PRIMARY KEY(blocker, blocked))")
+    c.execute("CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, reporter TEXT, reported TEXT, reason TEXT, time TEXT)")
+    c.commit()
+    return c
+try:
+    real_db().close()
+    print("REAL DB READY: users/posts/messages/saved/blocks/reports")
+except Exception as e:
+    print("DB init error:", e)
+
+@app.before_request
+def _safe_auto_save():
+    try:
+        from flask import request
+        if saver: saver.save_all(request)
+    except: pass
+app.secret_key = secrets.token_hex(16)  # Secure session(__name__)
+
+@app.after_request
+def _resume_inject(response):
+    try:
+        if response.content_type and "text/html" in response.content_type:
+            html = response.get_data(as_text=True)
+            js = """<script>
+(function(){
+  try{
+    var KEY="yung_last_state";
+    // Restore on load
+    var saved = JSON.parse(localStorage.getItem(KEY)||"null");
+    if(saved && saved.url===location.href){
+      setTimeout(function(){
+        window.scrollTo(0, saved.scroll||0);
+        if(saved.inputs){ Object.keys(saved.inputs).forEach(function(k){
+          var el=document.querySelector('[name="'+k+'"]'); if(el) el.value=saved.inputs[k];
+        });}
+      },100);
+    }
+    function save(){
+      var inputs={};
+      document.querySelectorAll("input,textarea,select").forEach(function(el){
+        if(el.name && el.type!=="password") inputs[el.name]=el.value;
+      localStorage.setItem(KEY, JSON.stringify({url:location.href, scroll:window.scrollY, inputs:inputs, time:Date.now()}));
+    }
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", function(){ if(document.hidden) save(); });
+    window.addEventListener("scroll", function(){ clearTimeout(window._rt); window._rt=setTimeout(save,300); });
+    document.addEventListener("input", save);
+    // Save last page for resume even if you close app
+    localStorage.setItem("yung_last_page", location.href);
+    // If you open root after minimize, go back to last page
+    if(location.pathname==="/" ){
+      var last=localStorage.getItem("yung_last_page");
+      if(last && last!==location.href && !sessionStorage.getItem("yung_resumed")){
+        sessionStorage.setItem("yung_resumed","1"); location.href=last;
+      }
+    } else { sessionStorage.removeItem("yung_resumed"); }
+  }catch(e){}
+})();
+</script>"""
+
+        if "</body>" in html:
+            html = html.replace("</body>", js+"</body>")
+        else:
+            html = html+js
+        response.set_data(html)
+    except Exception as e:
+        pass
+    return response
+
+app.secret_key="vibmagick123"
+os.makedirs("static/uploads", exist_ok=True)
+STYLE="body{background:#000;color:#fff;font-family:sans-serif;margin:0;padding-bottom:80px} .wrap{max-width:480px;margin:0 auto;padding:15px} input,textarea{width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #333;background:#111;color:#fff;box-sizing:border-box} button{padding:10px 18px;background:#fff;color:#000;border:none;border-radius:20px;font-weight:bold;cursor:pointer} a{color:#fff;text-decoration:none} .post{background:#111;border:1px solid #222;border-radius:12px;padding:12px;margin:12px 0} .nav{position:fixed;bottom:0;left:0;right:0;background:#000;border-top:1px solid #222;display:flex;justify-content:space-around;padding:10px 0;z-index:99} .nav a{text-align:center;font-size:12px} .nav span{font-size:22px;display:block} .card{background:#111;border-radius:12px;padding:12px;margin:10px 0;display:flex;align-items:center;gap:10px} .ava{width:44px;height:44px;border-radius:50%;background:#FE2C55;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:bold;flex-shrink:0}"
+def NAV():
+ return f"<div class='nav'><a href='/feed'><span>🏠</span>Home</a><a href='/friends'><span>👥</span>Friends</a><a href='/upload'><span style='background:#fff;color:#000;border-radius:12px;padding:2px 14px;font-size:24px'>+</span></a><a href='/inbox'><span>💬</span>Inbox</a><a href='/profile'><span>👤</span>You</a></div>"
+def db():
+ c=sqlite3.connect("vib.db")
+ c.execute("CREATE TABLE IF NOT EXISTS users(name TEXT,username TEXT,email TEXT,password TEXT,username TEXT)")
+ c.execute("CREATE TABLE IF NOT EXISTS posts(username TEXT,caption TEXT,file TEXT)")
+ c.execute("CREATE TABLE IF NOT EXISTS follows(follower TEXT,following TEXT)")
+ c.execute("CREATE TABLE IF NOT EXISTS msgs(sender TEXT,receiver TEXT,text TEXT,mtype TEXT)")
+ return c
+def me(): return session.get("user","")
+
+# --- FIX: load real data into the names your old code expects ---
+try:
+    _c = real_db()
+    users = {r["username"]: dict(r) for r in _c.execute("SELECT * FROM users").fetchall()}
+    posts = [dict(r) for r in _c.execute("SELECT * FROM posts ORDER BY id DESC").fetchall()]
+    messages = [dict(r) for r in _c.execute("SELECT * FROM messages ORDER BY id").fetchall()]
+    saved_posts = {}
+    for r in _c.execute("SELECT * FROM saved_posts").fetchall():
+        saved_posts.setdefault(r["username"], []).append(r["post_id"])
+    _c.close()
+    print(f"LOADED REAL: {len(users)} users, {len(posts)} posts, {len(messages)} messages")
+except Exception as e:
+    users = {}
+    posts = []
+    messages = []
+    saved_posts = {}
+    print("load fallback:", e)
+
+
+# --- SAVE BACK TO DB ---
+def save_all_real():
+    try:
+        c = real_db()
+        # users: dict username -> dict
+        if "users" in globals():
+            for uname, u in list(globals()["users"].items()):
+                if isinstance(u, dict):
+                    c.execute("INSERT OR REPLACE INTO users (username,password,bio,pic,verified,created) VALUES (?,?,?,?,?,?)",
+                        (uname, u.get("password",""), u.get("bio",""), u.get("pic",""), int(bool(u.get("verified",0))), u.get("created","")))
+        # posts: list of dicts
+        if "posts" in globals():
+            for po in list(globals()["posts"]):
+                if isinstance(po, dict) and "id" in po:
+                    c.execute("INSERT OR REPLACE INTO posts (id,username,caption,file,time) VALUES (?,?,?,?,?)",
+                        (po.get("id"), po.get("username",""), po.get("caption",""), po.get("file",""), po.get("time","")))
+        # messages: list of dicts
+        if "messages" in globals():
+            for m in list(globals()["messages"]):
+                if isinstance(m, dict) and "id" in m:
+                    c.execute("INSERT OR REPLACE INTO messages (id,sender,receiver,text,time,seen) VALUES (?,?,?,?,?,?)",
+                        (m.get("id"), m.get("sender",""), m.get("receiver",""), m.get("text",""), m.get("time",""), int(bool(m.get("seen",0)))))
+        c.commit(); c.close()
+    except Exception as e:
+        print("save_all_real skipped:", e)
+
+@app.after_request
+def _auto_save_all(response):
+    try:
+        save_all_real()
+    except: pass
+    return response
+
+@app.route("/")
+def home():
+ c=db(); users=c.execute("SELECT * FROM users").fetchall(); c.close()
+ h=""
+ for u in users: h+=f"<div class='card'><div class='ava'>{u[1][0].upper()}</div><b>@{u[1]}</b><a href='/login/{u[1]}' style='margin-left:auto'><button>Log in</button></a></div>"
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h1 style='text-align:center'>VibMagick</h1><h3 style='text-align:center'>Welcome back</h3>{h}<p style='text-align:center'><a href='/create'>+ Log into another account</a></p></div></body></html>'''
+@app.route("/login/<u>")
+def login(u): session["user"]=u; return redirect("/feed")
+@app.route("/create",methods=["GET","POST"])
+def create():
+ if request.method=="POST":
+  c=db(); c.execute("INSERT INTO users VALUES(?,?,?,?,?)",(request.form.get("name",""),request.form.get("username",""),request.form.get("email",""),request.form.get("password",""),"Hey! I'm on VibMagick")); c.commit(); c.close(); session["user"]=request.form.get("username",""); return redirect("/feed")
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h2 style='text-align:center'>Create account</h2><form method='post'><input name='name' placeholder='Full Name' required><input name='username' placeholder='Username' required><input name='email' placeholder='Email' type='email' required><input name='password' placeholder='Password' type='password' required><button style='width:100%'>Sign up</button></form></div></body></html>'''
+@app.route("/feed")
+def feed():
+ u=me(); c=db(); posts=c.execute("SELECT * FROM posts ORDER BY rowid DESC").fetchall(); c.close()
+ p=""
+ for x in posts:
+  media=f"<img src='/static/uploads/{x[2]}' style='width:100%;border-radius:10px;margin-top:8px'>" if x[2] and x[2].endswith(('.jpg','.png','.jpeg')) else (f"<video src='/static/uploads/{x[2]}' controls style='width:100%;border-radius:10px'></video>" if x[2] else "")
+  p+=f"<div class='post'><b>@{x[0]}</b><p>{x[1]}</p>{media}<div><a href='/profile/{x[0]}'>View Creator</a> | <a href='/chat/{x[0]}'>Message</a></div></div>"
+ if not p: p="<p style='text-align:center;color:#888'>No posts yet. Tap + to post!</p>"
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h1 style='text-align:center'>VibMagick</h1><p style='text-align:center'>Welcome @{u}</p>{p}</div>{NAV()}"</body></html>'''
+@app.route("/friends")
+def friends():
+ u=me(); q=request.args.get("q",""); c=db()
+ users=c.execute("SELECT * FROM users WHERE username LIKE ? AND username!=?",(f"%{q}%",u)).fetchall()
+ out=""
+ for x in users:
+  isf=c.execute("SELECT * FROM follows WHERE follower=? AND following=?",(u,x[1])).fetchone()
+  isback=c.execute("SELECT * FROM follows WHERE follower=? AND following=?",(x[1],u)).fetchone()
+  label="Unfollow" if isf else ("Follow Back" if isback else "Follow")
+  tag=" - Friends" if (isf and isback) else ""
+  out+=f"<div class='card'><div class='ava'>{x[1][0].upper()}</div><div><b>@{x[1]}</b><br><small>{x[4] or ''}{tag}</small></div><a href='/follow/{x[1]}' style='margin-left:auto'><button>{label}</button></a></div>"
+ c.close()
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h2>Friends</h2><form><input name='q' value='{q}' placeholder='Search users...'><button>Search</button></form><p>Follow back = Friends</p>{out or '<p>No users found</p>'}</div>{NAV()}"</body></html>'''
+@app.route("/follow/<t>")
+def follow(t):
+ u=me(); c=db()
+ if c.execute("SELECT * FROM follows WHERE follower=? AND following=?",(u,t)).fetchone(): c.execute("DELETE FROM follows WHERE follower=? AND following=?",(u,t))
+ else: c.execute("INSERT INTO follows VALUES(?,?)",(u,t))
+ c.commit(); c.close(); return redirect("/friends")
+@app.route("/upload",methods=["GET","POST"])
+def upload():
+ if request.method=="POST":
+  f=request.files.get("file"); fn=""
+  if f and f.filename: fn=f.filename; f.save(f"static/uploads/{fn}")
+  c=db(); c.execute("INSERT INTO posts VALUES(?,?,?)",(me(),request.form.get("caption",""),fn)); c.commit(); c.close(); return redirect("/feed")
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h2 style='text-align:center'>Upload</h2><form method='post' enctype='multipart/form-data'><textarea name='caption' placeholder='Write caption...' required></textarea><label>Picture / Video:<br><input type='file' name='file' accept='image/*,video/*'></label><br><label>Camera:<br><input type='file' name='file' accept='image/*' capture='user'></label><button style='width:100%;margin-top:10px'>Post Now</button></form></div>{NAV()}"</body></html>'''
+@app.route("/inbox")
+def inbox():
+ u=me(); c=db(); followers=c.execute("SELECT follower FROM follows WHERE following=?",(u,)).fetchall(); c.close()
+ h=""
+ for f in followers: h+=f"<div class='card'><div class='ava'>{f[0][0].upper()}</div><b>@{f[0]}</b><span style='color:#888'>follows you</span><a href='/chat/{f[0]}' style='margin-left:auto'><button>Chat</button></a></div>"
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h2>Inbox</h2>{h or '<p>No messages yet</p>'}</div>{NAV()}"</body></html>'''
+@app.route("/chat/<other>",methods=["GET","POST"])
+def chat(other):
+ u=me()
+ if request.method=="POST":
+  f=request.files.get("file"); txt=request.form.get("text",""); mt="text"; fn=txt
+  if f and f.filename: fn=f.filename; f.save(f"static/uploads/{fn}"); mt="file"
+  c=db(); c.execute("INSERT INTO msgs VALUES(?,?,?,?)",(u,other,fn,mt)); c.commit(); c.close(); return redirect(f"/chat/{other}")
+ c=db(); msgs=c.execute("SELECT * FROM msgs WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) ORDER BY rowid",(u,other,other,u)).fetchall(); c.close()
+ m=""
+ for x in msgs:
+  who="You" if x[0]==u else f"@{x[0]}"; bg="#FE2C55" if x[0]==u else "#222"
+  content=f"<video src='/static/uploads/{x[2]}' controls style='width:150px;height:150px;border-radius:50%;object-fit:cover'></video><br><small>Circle Video</small>" if x[3]=="file" and x[2].endswith(('.mp4','.mov','.webm')) else (f"<audio src='/static/uploads/{x[2]}' controls style='width:200px'></audio>" if x[3]=="file" and x[2].endswith(('.mp3','.wav','.m4a','.ogg')) else (f"<img src='/static/uploads/{x[2]}' style='width:150px;border-radius:10px'>" if x[3]=="file" else x[2]))
+  m+=f"<div style='background:{bg};padding:10px;border-radius:12px;margin:8px 0'><b>{who}</b><br>{content}</div>"
+ return f'''<html><head><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black'><meta name='apple-mobile-web-app-title' content='YuNg Alhaji'><link rel='apple-touch-icon' href='/static/icon.png'><meta name='theme-color' content='#000000'><meta name='viewport' content='width=device-width,initial-scale=1'><style>{STYLE}</style></head><body><div class='wrap'><h2>Chat with @{other}</h2>{m}<form method='post' enctype='multipart/form-data'><input name='text' placeholder='Type message...'><button>Send Text</button></form><form method='post' enctype='multipart/form-data'><label>Voice:<input type='file' name='file' accept='audio/*'></label><button>Send Voice</button></form><form method='post' enctype='multipart/form-data'><label>35s Circle Video:<input type='file' name='file' accept='video/*' capture='user'></label><button>Send Video</button></form></div>{NAV()}"</body></html>'''
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.route("/editusername",methods=["POST"])
+def editusername():
+ c=db(); c.execute("UPDATE users SET username=? WHERE username=?",(request.form.get("username",""),me())); c.commit(); c.close(); return redirect("/profile")
+@app.route("/static/uploads/<f>")
+def up(f): return send_from_directory("static/uploads",f)
+
+@app.route("/admin")
+def admin_panel():
+    # Only CEO fit enter
+    u = session.get("username", CEO_USERNAME)
+    if u != CEO_USERNAME:
+        return "<h1>Access Denied - CEO Only 👑</h1><a href='/'>Go Home</a>"
+    try:
+        total_users=len(users) if 'users' in globals() else 0
+        total_videos=len(videos) if 'videos' in globals() else 0
+    except: total_users=0; total_videos=0
+    return f"""
+    <h1>👑 CEO Dashboard - YuNg Alhaji</h1>
+    <p>Role: CEO / Admin</p>
+    <p>Total Users: {total_users}</p>
+    <p>Total Videos: {total_videos}</p>
+    <hr>
+    <a href='/'>Home</a> | <a href='/profile'>My Profile</a> | <a href='/admin/users'>Manage Users</a>
+    <br><br>
+    <button onclick="alert('You are CEO - you fit delete any video/user')">CEO Powers Active ✅</button>
+    """
+
+
+# --- 3. PROFILE AND CONTENT FEATURES ---
+# Verified Badge - CEO gets blue check
+CEO_USERNAME = "@realyungalhaji"
+
+def is_verified(username):
+    return username == CEO_USERNAME
+
+
+@app.route('/save/<int:post_id>')
+def save_post(post_id):
+    if 'user' not in session:
+        return redirect('/login')
+    me = session['user']
+    db = sqlite3.connect("app.db")
+    try:
+        db.execute("INSERT INTO saved (username, post_id) VALUES (?,?)", (me, post_id))
+        db.commit()
+    except:
+        db.execute("DELETE FROM saved WHERE username=? AND post_id=?", (me, post_id))
+        db.commit()
+    db.close()
+    return redirect('/saved')
+
+@app.route('/saved')
+def saved_posts():
+    if 'user' not in session:
+        return redirect('/login')
+    me = session['user']
+    db = sqlite3.connect("app.db")
+    db.row_factory = sqlite3.Row
+    rows = db.execute("SELECT posts.* FROM posts JOIN saved ON posts.id = saved.post_id WHERE saved.username=?", (me,)).fetchall()
+    db.close()
+    html = "<h2>Saved Posts</h2>"
+    for p in rows:
+        html += f"<div><b>{p['username']}</b> - {p['title']}<br><a href='/save/{p['id']}'>Unsave</a></div><hr>"
+    if not rows:
+        html += "<p>No saved posts yet.</p>"
+    html += "<a href='/'>Back to Home</a>"
+    return html
+
+@app.route('/block/<username>')
+def block_user(username):
+    if 'user' not in session:
+        return redirect('/login')
+    me = session['user']
+    db = sqlite3.connect("app.db")
+    try:
+        db.execute("INSERT INTO blocked (blocker, blocked_user) VALUES (?,?)", (me, username))
+        db.commit()
+    except: pass
+    db.close()
+    return redirect('/profile')
+
+@app.route('/unblock/<username>')
+def unblock_user(username):
+    if 'user' not in session:
+        return redirect('/login')
+    me = session['user']
+    db = sqlite3.connect("app.db")
+    db.execute("DELETE FROM blocked WHERE blocker=? AND blocked_user=?", (me, username))
+    db.commit()
+    db.close()
+    return redirect('/profile')
+
+@app.route('/report', methods=['GET','POST'])
+def report_user():
+    if 'user' not in session:
+        return redirect('/login')
+    if request.method == 'POST':
+        import datetime
+        db = sqlite3.connect("app.db")
+        db.execute("INSERT INTO reports (reporter, reported_user, post_id, reason, created_at) VALUES (?,?,?,?,?)",
+                   (session['user'], request.form.get('reported_user'), request.form.get('post_id'), request.form.get('reason'), str(datetime.datetime.now())))
+        db.commit()
+        db.close()
+        return "Report sent. Thank you. <a href='/'>Go Home</a>"
+    return """
+    <h2>Report User / Post</h2>
+    <form method="POST">
+        <input name="reported_user" placeholder="Username to report" required><br><br>
+        <input name="post_id" placeholder="Post ID (optional)"><br><br>
+        <textarea name="reason" placeholder="Reason for report" required></textarea><br><br>
+        <button type="submit">Send Report</button>
+    </form>
+    """
+
+
+@app.route('/chats_list')
+def chats_list_page():
+    if 'user' not in session and 'user_id' not in session:
+        return redirect('/login')
+    me = session.get('user') or session.get('username') or str(session.get('user_id'))
+    db = sqlite3.connect("app.db")
+    db.row_factory = sqlite3.Row
+    users = db.execute("SELECT username, name, pic, username FROM users WHERE username != ? LIMIT 50", (me,)).fetchall()
+    # Get last message for each user
+    html = "<div class='card'><h3 style='margin:0'>Start New Chat</h3><p style='color:#666;font-size:14px;'>Tap a user to chat</p></div>"
+    for u in users:
+        msg = db.execute("SELECT text, created_at FROM messages WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) ORDER BY id DESC LIMIT 1", (me, u['username'], u['username'], me)).fetchone()
+        last = msg['text'][:40] if msg else "Tap to start chatting"
+        time_str = msg['created_at'][11:16] if msg else ""
+        pic = u['pic'] or ''
+        pic_html = f"<img src='{pic}' style='width:50px;height:50px;border-radius:50%;object-fit:cover;'>" if pic else "<div style='width:50px;height:50px;border-radius:50%;background:#DDD;display:flex;align-items:center;justify-content:center;font-size:24px;'>👤</div>"
+        html += f"<a href='/chat/{u['username']}' style='text-decoration:none;color:#111;'><div class='card' style='display:flex;gap:12px;align-items:center;margin-bottom:8px;'>{pic_html}<div style='flex:1;'><b style='font-size:16px;'>{u['name'] or u['username']}</b><br><small style='color:#666;'>{last}</small></div><small style='color:#888;'>{time_str}</small></div></a>"
+    db.close()
+    return BASE('Chats', html)
+
+@app.route('/chat/<other>')
+def chat_page(other):
+    if 'user' not in session and 'user_id' not in session:
+        return redirect('/login')
+    me = session.get('user') or session.get('username') or str(session.get('user_id'))
+    db = sqlite3.connect("app.db")
+    db.row_factory = sqlite3.Row
+    user = db.execute("SELECT * FROM users WHERE username=?", (other,)).fetchone()
+    db.close()
+    if not user:
+        return BASE('Chat', "<div class='card'>User not found</div>")
+    name = user['name'] if 'name' in user.keys() and user['name'] else other
+    pic = user['pic'] if 'pic' in user.keys() and user['pic'] else ''
+    pic_html = f"<img src='{pic}' style='width:40px;height:40px;border-radius:50%;object-fit:cover;'>" if pic else "<div style='width:40px;height:40px;border-radius:50%;background:#DDD;display:flex;align-items:center;justify-content:center;'>👤</div>"
+    return BASE(f'Chat with {name}', f"""
+    <div style='background:#075E54;color:white;padding:10px 12px;border-radius:12px;display:flex;gap:10px;align-items:center;margin-bottom:12px;'>
+        {pic_html}<b>{name}</b><span style='font-size:12px;opacity:0.8;'>● Online</span>
+        <a href='/chats_list' style='margin-left:auto;color:white;'>✕</a>
+    </div>
+    <div id='msgs' style='height:380px;overflow-y:auto;background:#ECE5DD;padding:12px;border-radius:12px;display:flex;flex-direction:column;gap:8px;'></div>
+    <form onsubmit='sendMsg(event)' style='display:flex;gap:8px;margin-top:10px;'>
+        <input id='msgInput' placeholder='Type a message...' style='flex:1;border-radius:25px;'>
+        <button type='submit' style='width:55px;height:48px;border-radius:50%;padding:0;font-size:22px;'>➤</button>
+    </form>
+    <script>
+    let otherUser = "{other}";
+    let me = "{me}";
+    async function loadMsgs(){{
+        let r = await fetch('/api/messages/' + otherUser);
+        let data = await r.json();
+        let box = document.getElementById('msgs');
+        box.innerHTML = data.map(m => {{
+            let isMe = m.sender == me;
+            return `<div style='align-self:${{isMe ? 'flex-end' : 'flex-start'}};background:${{isMe ? '#DCF8C6' : 'white'}};padding:8px 12px;border-radius:12px;max-width:80%;box-shadow:0 1px 2px rgba(0,0,0,0.1)'><div>${{m.text}}</div><div style='font-size:11px;color:#888;text-align:right;'>${{m.created_at ? m.created_at.slice(11,16) : ''}} ${{isMe ? '✓✓' : ''}}</div></div>`;
+        }}).join('') || "<p style='text-align:center;color:#888;'>No messages yet. Say hello 👋</p>";
+        box.scrollTop = box.scrollHeight;
+    }}
+    async function sendMsg(e){{
+        e.preventDefault();
+        let inp = document.getElementById('msgInput');
+        if(!inp.value.trim()) return;
+        await fetch('/api/send_message', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{receiver: otherUser, text: inp.value}})}});
+        inp.value = '';
+        loadMsgs();
+    }}
+    loadMsgs(); setInterval(loadMsgs, 3000);
+    </script>
+    """)
+
+@app.route('/api/messages/<other>')
+def api_messages(other):
+    if 'user' not in session and 'user_id' not in session:
+        return {{"error":"login"}}, 401
+    me = session.get('user') or session.get('username') or str(session.get('user_id'))
+    db = sqlite3.connect("app.db")
+    db.row_factory = sqlite3.Row
+    rows = db.execute("SELECT * FROM messages WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) ORDER BY id ASC LIMIT 200", (me, other, other, me)).fetchall()
+    db.close()
+    return {{"messages": [dict(r) for r in rows]}}
+
+@app.route('/api/send_message', methods=['POST'])
+def api_send_message():
+    if 'user' not in session and 'user_id' not in session:
+        return {{"error":"login"}}, 401
+    me = session.get('user') or session.get('username') or str(session.get('user_id'))
+    j = request.get_json() or {}
+    receiver = j.get('receiver','')
+    text = j.get('text','').strip()
+    if not receiver or not text:
+        return {{"error":"empty"}}, 400
+    db = sqlite3.connect("app.db")
+    db.execute("INSERT INTO messages (sender, receiver, text) VALUES (?,?,?)", (me, receiver, text))
+    db.commit()
+    db.close()
+    return {{"ok": True}}
+
+
+try:
+    register_you(app, BASE)
+except Exception as e:
+    print('you page error', e)
+
+if __name__=="__main__": app.run(host="0.0.0.0",port=5000)
+@app.route('/admin/data')
+def _view_saved():
+    import sqlite3
+    c = sqlite3.connect('data.db')
+    rows = c.execute('SELECT * FROM saved_data ORDER BY id DESC LIMIT 200').fetchall()
+    c.close()
+    h = '<h1>Saved Data</h1><a href="/">Home</a><hr>'
+    for r in rows:
+        h += '<div>' + str(r) + '</div><hr>'
+    return h
+
+@app.route("/api/health")
+def _health():
+    try:
+        c = real_db()
+        u = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        po = c.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+        me = c.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        c.close()
+        return {"status":"REAL","ok":True,"users":u,"posts":po,"messages":me,"db":"data.db","uploads": os.path.exists("static/uploads")}
+    except Exception as e:
+        return {"status":"ERROR","ok":False,"error":str(e)}, 500
+
+# --- COMMENTS (real, saved) ---
+@app.route("/post/<int:post_id>/comments", methods=["GET","POST"])
+def _post_comments(post_id):
+    import sqlite3, datetime
+    c = real_db()
+    c.execute("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, username TEXT, text TEXT, time TEXT)")
+    c.commit()
+    if __import__("flask").request.method == "POST":
+        from flask import request, session, redirect
+        txt = request.form.get("text","").strip()
+        user = session.get("username") or session.get("user") or "Guest"
+        if txt:
+            c.execute("INSERT INTO comments (post_id,username,text,time) VALUES (?,?,?,?)", (post_id, user, txt, datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
+            c.commit()
+        c.close()
+        return redirect(f"/post/{post_id}/comments")
+    rows = c.execute("SELECT * FROM comments WHERE post_id=? ORDER BY id", (post_id,)).fetchall()
+    c.close()
+    h = f"<h2>Comments for Post {post_id}</h2><a href='/'>Back Home</a><hr>"
+    if not rows:
+        h += "<p>No comments yet. Be first!</p>"
+    for r in rows:
+        h += f"<div style='border:1px solid #333;padding:10px;margin:10px;border-radius:10px'><b>@{r['username']}</b> <small>{r['time']}</small><br>{r['text']}</div>"
+    h += f"<form method='POST' style='margin:15px'><input name='text' placeholder='Write a comment...' style='width:70%;padding:10px' required> <button style='padding:10px'>Send</button></form>"
+    return h
+
+@app.route("/api/comments/<int:post_id>")
+def _api_comments(post_id):
+    from flask import jsonify
+    c = real_db()
+    c.execute("CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, username TEXT, text TEXT, time TEXT)")
+    rows = c.execute("SELECT * FROM comments WHERE post_id=? ORDER BY id", (post_id,)).fetchall()
+    c.close()
+    return jsonify([dict(r) for r in rows])
+
+# Inject Comment button into every post card on every page
+@app.after_request
+def _inject_comment_btn(response):
+    try:
+        if response.content_type and "text/html" in response.content_type:
+            html = response.get_data(as_text=True)
+            if "View Creator" in html and "comment-btn" not in html:
+                js = """
+<script>
+document.querySelectorAll('a').forEach(a=>{
+  if(a.href && a.href.includes('/post/') && a.href.includes('/comments')) return;
+});
+ // Add comment button under each post - find post id from links, fallback to page
+document.addEventListener('click', e=>{
+  if(e.target.classList && e.target.classList.contains('comment-btn')){
+    let id = e.target.getAttribute('data-id');
+    window.location.href = '/post/' + id + '/comments';
+  }
+});
+</script>
+<style>.comment-btn{background:#222;color:#fff;border:1px solid #444;padding:6px 12px;border-radius:20px;cursor:pointer;margin-left:5px}</style>
+"""
+                # add a simple floating comment entry: user taps post to comment via prompt for post id is confusing,
+                # so we add a button next to every "Message" link using JS that guesses post id from order
+                html = html.replace("</body>", js + "</body>") if "</body>" in html else html + js
+                # Add visible button after every "Message" text
+                html = html.replace("Message", "Message | <a href='/post/1/comments'>💬 Comments</a>")
+                response.set_data(html)
+    except Exception as e:
+        print("comment inject skipped:", e)
+    return response

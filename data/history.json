@@ -1,0 +1,26 @@
+[
+  {
+    "time": "2026-11-25 15:47:35.787953",
+    "type": "avatar",
+    "old": "https://i.imgur.com/8Km9tLL.jpg",
+    "new": "/static/uploads/avatar.jpg?t=1795618055"
+  },
+  {
+    "time": "2026-11-25 15:53:59.868512",
+    "type": "bio",
+    "old": "CEO & Admin - Artist",
+    "new": "CEO & Admin "
+  },
+  {
+    "time": "2026-11-25 16:24:48.512611",
+    "type": "bio",
+    "old": "CEO & Admin ",
+    "new": "CEO"
+  },
+  {
+    "time": "2026-11-25 18:45:26.204350",
+    "type": "avatar",
+    "old": "/static/uploads/avatar.jpg?t=1795618055",
+    "new": "/static/uploads/avatar.jpg?t=1795628726"
+  }
+]
