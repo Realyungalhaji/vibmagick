@@ -21,11 +21,11 @@ def db():
     c.execute("CREATE TABLE IF NOT EXISTS likes (username TEXT, post_id TEXT, UNIQUE(username,post_id))")
     c.execute("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT)")
     c.commit()
-      try:
-        c.execute("ALTER TABLE users ADD COLUMN pic TEXT")
-        c.commit()
+    try:
+     c.execute("ALTER TABLE users ADD COLUMN pic TEXT")
+     c.commit()
     except:
-        pass
+     pass
     return c
 
 db().close()
